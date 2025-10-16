@@ -170,7 +170,7 @@ def apply_imdb_rating_overlay(base_img: Image.Image, tmdb_id: int, movie_path: P
     # We use bbox[1] as the vertical offset from the text's natural baseline.
     
     # FIX: Apply a visual adjustment to pull the text up. This is a tested value for size 80/box 80.
-    visual_baseline_adjustment = -10
+    visual_baseline_adjustment = -12
     
     # Calculate vertical starting position based on center and text height
     text_y = box_center_y - (text_h / 2)
