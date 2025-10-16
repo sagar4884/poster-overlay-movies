@@ -108,11 +108,12 @@ def apply_imdb_rating_overlay(base_img: Image.Image, tmdb_id: int, movie_path: P
     """Fetches TMDb rating and draws the yellow box overlay (styled as IMDb)."""
     print("   -> Fetching IMDb rating...")
     
-    # FIX: Fetch data inside the function to ensure vote_average is defined
+    # Use the TMDb ID to fetch details
     data = get_movie_details(tmdb_id)
     if not data:
         return base_img
         
+    # FIX: Define vote_average and vote_count locally right after data fetch
     vote_average = data.get("vote_average", 0.0)
     vote_count = data.get("vote_count", 0)
 
@@ -120,7 +121,7 @@ def apply_imdb_rating_overlay(base_img: Image.Image, tmdb_id: int, movie_path: P
         print(f"   [INFO] Skipping IMDb overlay due to low vote count ({vote_count}).")
         return base_img
 
-    # Use TMDb rating rounded to one decimal place for display
+    # Now vote_average is correctly defined and accessible
     imdb_rating = round(vote_average, 1) 
     rating_text = f"{imdb_rating}"
     
@@ -351,7 +352,6 @@ def main():
         
     print("=" * 40)
     # The script completes and exits here for normal operation
-    # Adding an explicit sys.exit(0) can sometimes help ensure the container stops immediately
     sys.exit(0) 
 
 if __name__ == "__main__":
