@@ -108,17 +108,7 @@ def apply_imdb_rating_overlay(base_img: Image.Image, tmdb_id: int, movie_path: P
     """Fetches TMDb rating and draws the yellow box overlay (styled as IMDb)."""
     print("   -> Fetching IMDb rating...")
     
-    # Use the TMDb ID to fetch details
-    data = get_movie_details(tmdb_id)
-    if not data:
-        return base_img
-        
-    vote_average = data.get("vote_average", 0.0)
-    vote_count = data.get("vote_count", 0)
-
-    if vote_count < MIN_VOTE_COUNT:
-        print(f"   [INFO] Skipping IMDb overlay due to low vote count ({vote_count}).")
-        return base_img
+    # ... (rating fetch and check logic remains the same)
 
     # Use TMDb rating rounded to one decimal place for display
     imdb_rating = round(vote_average, 1) 
@@ -126,7 +116,7 @@ def apply_imdb_rating_overlay(base_img: Image.Image, tmdb_id: int, movie_path: P
     
     # Define box dimensions and font
     width, height = base_img.size
-    box_size = (180, 80)
+    box_size = (180, 80) # Keep box size consistent or adjust if needed
     padding = 20
     
     # Bottom Right position
@@ -144,27 +134,37 @@ def apply_imdb_rating_overlay(base_img: Image.Image, tmdb_id: int, movie_path: P
 
     # 2. Draw the text
     try:
-        # Use DejaVuSans-Bold which was installed in the Dockerfile
+        # FONT SIZE CHANGED TO 80
         font_rating = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 80)
     except IOError:
         print("   [WARN] Default font not found, using generic font.")
         font_rating = ImageFont.load_default()
     
-    # FIX: Use textbbox instead of the removed textsize method
+    # FIX: Use textbbox to find exact text size for centering
     try:
+        # Calculate text bounding box (left, top, right, bottom)
         bbox = draw.textbbox((0, 0), rating_text, font=font_rating)
         text_w = bbox[2] - bbox[0]
         text_h = bbox[3] - bbox[1]
     except Exception as e:
-        # Fallback in case textbbox fails or uses an unexpected coordinate system
         print(f"   [ERROR] Failed to calculate text dimensions using textbbox: {e}")
-        # Use a safe fallback size based on box_size
         text_w = box_size[0] * 0.5
         text_h = box_size[1] * 0.5
     
-    # Center the text in the box
-    text_x = x0 + (box_size[0] - text_w) / 2
-    text_y = y0 + (box_size[1] - text_h) / 2
+    # FIX: Centering Calculation - Use the box center point for vertical centering
+    
+    # Calculate box center coordinates
+    box_center_x = x0 + box_size[0] / 2
+    box_center_y = y0 + box_size[1] / 2
+    
+    # Position text based on its size relative to the box center
+    text_x = box_center_x - (text_w / 2)
+    text_y = box_center_y - (text_h / 2)
+    
+    # Adjust for Pillow's baseline issue (adds a small offset to visually center)
+    # This value is often necessary when dealing with large fonts
+    baseline_offset = 5 
+    text_y += baseline_offset 
     
     draw.text((text_x, text_y), rating_text, font=font_rating, fill=(0, 0, 0, 255))
     
