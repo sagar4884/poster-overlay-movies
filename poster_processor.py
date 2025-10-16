@@ -145,7 +145,7 @@ def apply_imdb_rating_overlay(base_img: Image.Image, tmdb_id: int, movie_path: P
     # 2. Draw the text
     try:
         # Use DejaVuSans-Bold which was installed in the Dockerfile
-        font_rating = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 70)
+        font_rating = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 80)
     except IOError:
         print("   [WARN] Default font not found, using generic font.")
         font_rating = ImageFont.load_default()
