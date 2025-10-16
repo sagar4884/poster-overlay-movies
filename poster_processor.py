@@ -108,7 +108,17 @@ def apply_imdb_rating_overlay(base_img: Image.Image, tmdb_id: int, movie_path: P
     """Fetches TMDb rating and draws the yellow box overlay (styled as IMDb)."""
     print("   -> Fetching IMDb rating...")
     
-    # ... (rating fetch and check logic remains the same)
+    # FIX: Fetch data inside the function to ensure vote_average is defined
+    data = get_movie_details(tmdb_id)
+    if not data:
+        return base_img
+        
+    vote_average = data.get("vote_average", 0.0)
+    vote_count = data.get("vote_count", 0)
+
+    if vote_count < MIN_VOTE_COUNT:
+        print(f"   [INFO] Skipping IMDb overlay due to low vote count ({vote_count}).")
+        return base_img
 
     # Use TMDb rating rounded to one decimal place for display
     imdb_rating = round(vote_average, 1) 
@@ -134,13 +144,13 @@ def apply_imdb_rating_overlay(base_img: Image.Image, tmdb_id: int, movie_path: P
 
     # 2. Draw the text
     try:
-        # FONT SIZE CHANGED TO 80
+        # FONT SIZE CHANGED TO 80 for centering fix
         font_rating = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 80)
     except IOError:
         print("   [WARN] Default font not found, using generic font.")
         font_rating = ImageFont.load_default()
     
-    # FIX: Use textbbox to find exact text size for centering
+    # Use textbbox to find exact text size for centering
     try:
         # Calculate text bounding box (left, top, right, bottom)
         bbox = draw.textbbox((0, 0), rating_text, font=font_rating)
@@ -151,7 +161,7 @@ def apply_imdb_rating_overlay(base_img: Image.Image, tmdb_id: int, movie_path: P
         text_w = box_size[0] * 0.5
         text_h = box_size[1] * 0.5
     
-    # FIX: Centering Calculation - Use the box center point for vertical centering
+    # Centering Calculation - Use the box center point for vertical centering
     
     # Calculate box center coordinates
     box_center_x = x0 + box_size[0] / 2
@@ -162,7 +172,6 @@ def apply_imdb_rating_overlay(base_img: Image.Image, tmdb_id: int, movie_path: P
     text_y = box_center_y - (text_h / 2)
     
     # Adjust for Pillow's baseline issue (adds a small offset to visually center)
-    # This value is often necessary when dealing with large fonts
     baseline_offset = 5 
     text_y += baseline_offset 
     
@@ -275,7 +284,7 @@ def restore_posters():
     print("!!! RESTORE MODE ACTIVATED !!!")
     
     found_restores = 0
-    # ... (rest of the restore_posters function remains the same)
+    
     for movie_path in MEDIA_ROOT.rglob('*'):
         if movie_path.is_dir() and movie_path.name.lower() != ORIGINAL_FOLDER_NAME:
             source = movie_path / ORIGINAL_FOLDER_NAME / ORIGINAL_POSTER_NAME
@@ -307,6 +316,7 @@ def main():
         restore_posters()
         if PLEX_REFRESH:
             run_plex_refresh()
+        # The script exits here for RESTORE mode
         return
 
     print("=" * 40)
@@ -340,6 +350,9 @@ def main():
         run_plex_refresh()
         
     print("=" * 40)
+    # The script completes and exits here for normal operation
+    # Adding an explicit sys.exit(0) can sometimes help ensure the container stops immediately
+    sys.exit(0) 
 
 if __name__ == "__main__":
     main()
