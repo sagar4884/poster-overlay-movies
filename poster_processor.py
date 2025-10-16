@@ -104,7 +104,6 @@ def fetch_poster(tmdb_id: int, movie_path: Path):
         print(f"   [ERROR] Could not process or save image for {movie_path.name}: {e}")
         return False
 
-# FIX: Added movie_path to the arguments
 def apply_imdb_rating_overlay(base_img: Image.Image, tmdb_id: int, movie_path: Path) -> Image.Image:
     """Fetches TMDb rating and draws the yellow box overlay (styled as IMDb)."""
     print("   -> Fetching IMDb rating...")
@@ -151,8 +150,19 @@ def apply_imdb_rating_overlay(base_img: Image.Image, tmdb_id: int, movie_path: P
         print("   [WARN] Default font not found, using generic font.")
         font_rating = ImageFont.load_default()
     
+    # FIX: Use textbbox instead of the removed textsize method
+    try:
+        bbox = draw.textbbox((0, 0), rating_text, font=font_rating)
+        text_w = bbox[2] - bbox[0]
+        text_h = bbox[3] - bbox[1]
+    except Exception as e:
+        # Fallback in case textbbox fails or uses an unexpected coordinate system
+        print(f"   [ERROR] Failed to calculate text dimensions using textbbox: {e}")
+        # Use a safe fallback size based on box_size
+        text_w = box_size[0] * 0.5
+        text_h = box_size[1] * 0.5
+    
     # Center the text in the box
-    text_w, text_h = draw.textsize(rating_text, font=font_rating)
     text_x = x0 + (box_size[0] - text_w) / 2
     text_y = y0 + (box_size[1] - text_h) / 2
     
@@ -229,7 +239,6 @@ def process_movie_folder(movie_path: Path, tmdb_id: int):
 
     # 5. OVERLAY 3: DYNAMIC IMDB RATING (Yellow Box)
     if APPLY_IMDB_RATING:
-        # FIX: Pass movie_path to the function
         base_img = apply_imdb_rating_overlay(base_img, tmdb_id, movie_path)
 
     # 6. SAVE FINAL POSTER
