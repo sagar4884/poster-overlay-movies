@@ -1,0 +1,10 @@
+# Ignore directories and files used by Git
+.git
+.gitignore
+README.md
+
+# Ignore Python cache and environment files
+__pycache__
+*.pyc
+venv
+.venv
