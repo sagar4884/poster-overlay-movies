@@ -148,12 +148,12 @@ def apply_imdb_rating_overlay(base_img: Image.Image, tmdb_id: int, movie_path: P
         print("   [WARN] Default font not found, using generic font.")
         font_rating = ImageFont.load_default()
     
-    # Final Centering Logic: Get the text dimensions and adjust placement
+    # Get bounding box for horizontal centering
     try:
-        # Get bounding box (left, top, right, bottom) assuming text starts at (0, 0)
+        # Returns (left, top, right, bottom)
         bbox = draw.textbbox((0, 0), rating_text, font=font_rating)
         text_w = bbox[2] - bbox[0]
-        text_h = bbox[3] - bbox[1]
+        text_h = bbox[3] - bbox[1] # This is the full rendered height
     except Exception as e:
         print(f"   [ERROR] Failed to calculate text dimensions using textbbox: {e}")
         text_w = box_size[0] * 0.5
@@ -163,20 +163,17 @@ def apply_imdb_rating_overlay(base_img: Image.Image, tmdb_id: int, movie_path: P
     box_center_x = x0 + box_size[0] / 2
     box_center_y = y0 + box_size[1] / 2
     
-    # Horizontal Positioning: Simple centering based on text width
+    # Horizontal Positioning: Simple centering
     text_x = box_center_x - (text_w / 2)
     
-    # Vertical Positioning: Complex centering using the text's top/bottom offset
-    # The bbox[1] is the offset from the top, which needs to be corrected for the baseline.
+    # Vertical Positioning: Use bounding box Y (top) and apply empirical offset
+    # We use bbox[1] as the vertical offset from the text's natural baseline.
     
-    # Center the *entire height* of the text block relative to the box center
-    # text_y needs to start from the center of the box minus half the text height
-    # AND compensate for the text's internal vertical offset (bbox[1] - top edge)
+    # FIX: Apply a visual adjustment to pull the text up. This is a tested value for size 80/box 80.
+    visual_baseline_adjustment = -10
+    
+    # Calculate vertical starting position based on center and text height
     text_y = box_center_y - (text_h / 2)
-    
-    # Add a small, empirical correction factor for visual alignment
-    # This factor is often required to align digital fonts perfectly with a box
-    visual_baseline_adjustment = 0 
     
     draw.text((text_x, text_y + visual_baseline_adjustment), rating_text, font=font_rating, fill=(0, 0, 0, 255))
     
