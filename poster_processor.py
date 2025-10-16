@@ -25,7 +25,6 @@ MIN_VOTE_COUNT = int(os.environ.get("MIN_VOTE_COUNT", 500))
 # TMDb URLs
 TMDB_BASE_URL = "https://api.themoviedb.org/3/movie/"
 TMDB_IMAGE_BASE_URL = "https://image.tmdb.org/t/p/"
-# We will request the original resolution image and resize it locally for best quality
 IMAGE_SIZE_PATH = "original" 
 TARGET_SIZE = (1000, 1500)
 TMDB_ID_REGEX = re.compile(r"\[tmdbid-(\d+)\]", re.IGNORECASE)
@@ -50,7 +49,8 @@ PLEX_REFRESH = os.environ.get("PLEX_REFRESH", "false").lower() == "true"
 PLEX_IP = os.environ.get("PLEX_IP")
 PLEX_PORT = os.environ.get("PLEX_PORT")
 PLEX_TOKEN = os.environ.get("PLEX_TOKEN")
-PLEX_LIBRARY_ID = os.environ.get("PLEX_LIBRARY_ID")
+# PLEX_LIBRARY_ID: Now supports comma-separated list
+PLEX_LIBRARY_IDS = [id.strip() for id in os.environ.get("PLEX_LIBRARY_ID", "").split(',') if id.strip()]
 
 
 # --- HELPER FUNCTIONS ---
@@ -104,20 +104,13 @@ def fetch_poster(tmdb_id: int, movie_path: Path):
         print(f"   [ERROR] Could not process or save image for {movie_path.name}: {e}")
         return False
 
-def apply_imdb_rating_overlay(base_img: Image.Image, imdb_id: str) -> Image.Image:
-    """Fetches IMDb rating and draws the yellow box overlay."""
+# FIX: Added movie_path to the arguments
+def apply_imdb_rating_overlay(base_img: Image.Image, tmdb_id: int, movie_path: Path) -> Image.Image:
+    """Fetches TMDb rating and draws the yellow box overlay (styled as IMDb)."""
     print("   -> Fetching IMDb rating...")
     
-    # We must use a secondary API or scraping to get the rating, as TMDb's external_ids does not return the rating, only the ID.
-    # For simplicity and reliability in a container environment, we'll use a placeholder/simplified fetcher.
-    # NOTE: A real implementation would require an additional API (like OMDB) or scraping.
-    # We will use a calculated value here to simulate a successful API call.
-    
-    # Placeholder for actual API call
-    # imdb_rating = fetch_imdb_rating(imdb_id) 
-    # For now, let's use the TMDb vote average for consistency, but visually label it as IMDb
-    
-    data = get_movie_details(movie_path.name.split('-')[-1]) # Hacky way to reuse details call
+    # Use the TMDb ID to fetch details
+    data = get_movie_details(tmdb_id)
     if not data:
         return base_img
         
@@ -128,7 +121,8 @@ def apply_imdb_rating_overlay(base_img: Image.Image, imdb_id: str) -> Image.Imag
         print(f"   [INFO] Skipping IMDb overlay due to low vote count ({vote_count}).")
         return base_img
 
-    imdb_rating = round(vote_average, 1) # Use TMDb rating rounded to one decimal place for display
+    # Use TMDb rating rounded to one decimal place for display
+    imdb_rating = round(vote_average, 1) 
     rating_text = f"{imdb_rating}"
     
     # Define box dimensions and font
@@ -151,6 +145,7 @@ def apply_imdb_rating_overlay(base_img: Image.Image, imdb_id: str) -> Image.Imag
 
     # 2. Draw the text
     try:
+        # Use DejaVuSans-Bold which was installed in the Dockerfile
         font_rating = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 40)
     except IOError:
         print("   [WARN] Default font not found, using generic font.")
@@ -234,8 +229,8 @@ def process_movie_folder(movie_path: Path, tmdb_id: int):
 
     # 5. OVERLAY 3: DYNAMIC IMDB RATING (Yellow Box)
     if APPLY_IMDB_RATING:
-        # Note: We pass the base_img to the function which handles the rating fetch/draw
-        base_img = apply_imdb_rating_overlay(base_img, tmdb_id) # Using tmdb_id for details fetch
+        # FIX: Pass movie_path to the function
+        base_img = apply_imdb_rating_overlay(base_img, tmdb_id, movie_path)
 
     # 6. SAVE FINAL POSTER
     try:
@@ -247,20 +242,23 @@ def process_movie_folder(movie_path: Path, tmdb_id: int):
         print(f"   [ERROR] Failed to save final poster for {movie_path.name}: {e}")
 
 def run_plex_refresh():
-    """Triggers a library scan on Plex via API."""
-    if not PLEX_IP or not PLEX_PORT or not PLEX_TOKEN or not PLEX_LIBRARY_ID:
+    """Triggers a library scan on Plex via API for one or more library IDs."""
+    if not PLEX_REFRESH or not PLEX_IP or not PLEX_PORT or not PLEX_TOKEN or not PLEX_LIBRARY_IDS:
         print("[WARN] Plex Refresh is enabled but connection details are incomplete. Skipping refresh.")
         return
-        
-    plex_url = f"http://{PLEX_IP}:{PLEX_PORT}/library/sections/{PLEX_LIBRARY_ID}/refresh?X-Plex-Token={PLEX_TOKEN}"
-    print(f"Attempting Plex Library Refresh on section {PLEX_LIBRARY_ID}...")
     
-    try:
-        response = requests.get(plex_url, timeout=15)
-        response.raise_for_status()
-        print("[SUCCESS] Plex refresh initiated.")
-    except requests.exceptions.RequestException as e:
-        print(f"[ERROR] Failed to call Plex refresh API: {e}")
+    print("Attempting Plex Library Refresh...")
+
+    for library_id in PLEX_LIBRARY_IDS:
+        plex_url = f"http://{PLEX_IP}:{PLEX_PORT}/library/sections/{library_id}/refresh?X-Plex-Token={PLEX_TOKEN}"
+        print(f"   -> Triggering refresh for section ID: {library_id}")
+        
+        try:
+            response = requests.get(plex_url, timeout=15)
+            response.raise_for_status()
+            print(f"   [SUCCESS] Plex refresh initiated for ID {library_id}.")
+        except requests.exceptions.RequestException as e:
+            print(f"   [ERROR] Failed to call Plex refresh API for ID {library_id}: {e}")
 
 def restore_posters():
     """Restores poster.jpg from original/original_poster.jpg."""
@@ -268,6 +266,7 @@ def restore_posters():
     print("!!! RESTORE MODE ACTIVATED !!!")
     
     found_restores = 0
+    # ... (rest of the restore_posters function remains the same)
     for movie_path in MEDIA_ROOT.rglob('*'):
         if movie_path.is_dir() and movie_path.name.lower() != ORIGINAL_FOLDER_NAME:
             source = movie_path / ORIGINAL_FOLDER_NAME / ORIGINAL_POSTER_NAME
