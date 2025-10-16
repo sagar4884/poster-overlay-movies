@@ -113,7 +113,6 @@ def apply_imdb_rating_overlay(base_img: Image.Image, tmdb_id: int, movie_path: P
     if not data:
         return base_img
         
-    # FIX: Define vote_average and vote_count locally right after data fetch
     vote_average = data.get("vote_average", 0.0)
     vote_count = data.get("vote_count", 0)
 
@@ -121,13 +120,12 @@ def apply_imdb_rating_overlay(base_img: Image.Image, tmdb_id: int, movie_path: P
         print(f"   [INFO] Skipping IMDb overlay due to low vote count ({vote_count}).")
         return base_img
 
-    # Now vote_average is correctly defined and accessible
     imdb_rating = round(vote_average, 1) 
     rating_text = f"{imdb_rating}"
     
     # Define box dimensions and font
     width, height = base_img.size
-    box_size = (180, 80) # Keep box size consistent or adjust if needed
+    box_size = (180, 80)
     padding = 20
     
     # Bottom Right position
@@ -141,19 +139,18 @@ def apply_imdb_rating_overlay(base_img: Image.Image, tmdb_id: int, movie_path: P
     draw = ImageDraw.Draw(overlay)
 
     # 1. Draw the yellow box (IMDb color)
-    draw.rectangle([x0, y0, x1, y1], fill=(245, 197, 24, 255)) # IMDb Yellow
+    draw.rectangle([x0, y0, x1, y1], fill=(245, 197, 24, 255))
 
     # 2. Draw the text
     try:
-        # FONT SIZE CHANGED TO 80 for centering fix
         font_rating = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 80)
     except IOError:
         print("   [WARN] Default font not found, using generic font.")
         font_rating = ImageFont.load_default()
     
-    # Use textbbox to find exact text size for centering
+    # Final Centering Logic: Get the text dimensions and adjust placement
     try:
-        # Calculate text bounding box (left, top, right, bottom)
+        # Get bounding box (left, top, right, bottom) assuming text starts at (0, 0)
         bbox = draw.textbbox((0, 0), rating_text, font=font_rating)
         text_w = bbox[2] - bbox[0]
         text_h = bbox[3] - bbox[1]
@@ -162,21 +159,26 @@ def apply_imdb_rating_overlay(base_img: Image.Image, tmdb_id: int, movie_path: P
         text_w = box_size[0] * 0.5
         text_h = box_size[1] * 0.5
     
-    # Centering Calculation - Use the box center point for vertical centering
-    
-    # Calculate box center coordinates
+    # Calculate target box center
     box_center_x = x0 + box_size[0] / 2
     box_center_y = y0 + box_size[1] / 2
     
-    # Position text based on its size relative to the box center
+    # Horizontal Positioning: Simple centering based on text width
     text_x = box_center_x - (text_w / 2)
+    
+    # Vertical Positioning: Complex centering using the text's top/bottom offset
+    # The bbox[1] is the offset from the top, which needs to be corrected for the baseline.
+    
+    # Center the *entire height* of the text block relative to the box center
+    # text_y needs to start from the center of the box minus half the text height
+    # AND compensate for the text's internal vertical offset (bbox[1] - top edge)
     text_y = box_center_y - (text_h / 2)
     
-    # Adjust for Pillow's baseline issue (adds a small offset to visually center)
-    baseline_offset = 5 
-    text_y += baseline_offset 
+    # Add a small, empirical correction factor for visual alignment
+    # This factor is often required to align digital fonts perfectly with a box
+    visual_baseline_adjustment = 0 
     
-    draw.text((text_x, text_y), rating_text, font=font_rating, fill=(0, 0, 0, 255))
+    draw.text((text_x, text_y + visual_baseline_adjustment), rating_text, font=font_rating, fill=(0, 0, 0, 255))
     
     # Composite the overlay onto the base image
     base_img.alpha_composite(overlay)
